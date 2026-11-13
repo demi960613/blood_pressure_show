@@ -296,6 +296,24 @@ function moveGuideStep(offset) {
     const nextStep = currentGuideStep + offset;
     if (nextStep < 0 || nextStep >= guideSteps.length) return;
 
+    // ===== 新增：時光倒流防呆機制 =====
+    // 如果是「上一步」(offset === -1)，且正要回到「點擊開啟彈窗」(index 10) 的步驟
+    if (offset === -1 && nextStep === 10 && liveAppDocument) {
+        const gameModal = liveAppDocument.querySelector('#game-modal-overlay');
+        if (gameModal) {
+            // 嘗試尋找彈窗內的關閉按鈕 (通常右上角的 X) 並觸發點擊
+            // 這裡列了幾個常見的 class/id 命名，你可以依據你的血壓網站實際名稱調整
+            const closeBtn = gameModal.querySelector('.close-btn, .close, #close-modal-btn, button[aria-label="Close"]');
+            if (closeBtn) {
+                closeBtn.click();
+            } else {
+                // 如果找不到按鈕，直接觸發 Escape 鍵或將它隱藏
+                gameModal.style.display = 'none'; 
+            }
+        }
+    }
+    // ===================================
+
     currentGuideStep = nextStep;
     showSlide(guideSteps[currentGuideStep].slide, { keepGuideStep: true });
     updateGuideStep();
