@@ -67,11 +67,6 @@ input:focus-visible {
     background: #fdf2f8;
     border: 1px solid #f472b6;
     border-radius: 20px;
-}
-
-.quick-nav select,
-.quick-nav button,
-.nav-controls button {
     cursor: pointer;
 }
 
@@ -97,6 +92,7 @@ input:focus-visible {
     overflow: hidden;
     background: #fff;
     box-shadow: 0 12px 32px rgba(131, 24, 67, 0.14);
+    border-radius: 12px;
 }
 
 .slide-image {
@@ -251,6 +247,7 @@ input:focus-visible {
     outline-offset: 3px;
 }
 
+/* 導覽面板與自訂捲軸 */
 .guide-panel {
     position: relative;
     display: flex;
@@ -266,7 +263,28 @@ input:focus-visible {
     box-shadow: 0 12px 36px rgba(76, 5, 25, 0.24);
 }
 
-.site-demo-dialog {
+.guide-panel::-webkit-scrollbar,
+.site-demo-layout .guide-panel::-webkit-scrollbar {
+    width: 8px;
+}
+.guide-panel::-webkit-scrollbar-track,
+.site-demo-layout .guide-panel::-webkit-scrollbar-track {
+    background: #fdf2f8;
+    border-radius: 4px;
+}
+.guide-panel::-webkit-scrollbar-thumb,
+.site-demo-layout .guide-panel::-webkit-scrollbar-thumb {
+    background: #f9a8d4;
+    border-radius: 4px;
+}
+.guide-panel::-webkit-scrollbar-thumb:hover,
+.site-demo-layout .guide-panel::-webkit-scrollbar-thumb:hover {
+    background: #f472b6;
+}
+
+/* 彈窗元件與淡入動畫 */
+.site-demo-dialog,
+.zoom-dialog {
     display: flex;
     flex-direction: column;
     width: min(96vw, 1680px);
@@ -281,11 +299,29 @@ input:focus-visible {
     box-shadow: 0 18px 60px rgba(76, 5, 25, 0.3);
 }
 
-.site-demo-dialog:not([open]) {
+.site-demo-dialog[open],
+.zoom-dialog[open] {
+    animation: dialogFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dialogFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.site-demo-dialog:not([open]),
+.zoom-dialog:not([open]) {
     display: none;
 }
 
-.site-demo-dialog::backdrop {
+.site-demo-dialog::backdrop,
+.zoom-dialog::backdrop {
     background: rgba(45, 10, 25, 0.76);
     backdrop-filter: blur(4px);
 }
@@ -359,6 +395,7 @@ input:focus-visible {
     border-radius: 14px;
 }
 
+/* 導覽高亮紅框與呼吸燈效果 */
 .tour-highlight-box {
     position: absolute;
     z-index: 2;
@@ -374,6 +411,13 @@ input:focus-visible {
 
 .tour-highlight-box.is-visible {
     opacity: 1;
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0px rgba(236, 72, 153, 0.5); }
+    70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+    100% { box-shadow: 0 0 0 0px rgba(236, 72, 153, 0); }
 }
 
 .live-app-frame iframe {
@@ -449,19 +493,8 @@ input:focus-visible {
 
 .zoom-dialog {
     width: min(96vw, 1800px);
-    max-width: none;
     max-height: 94dvh;
     padding: 12px;
-    overflow: hidden;
-    background: #fff;
-    border: 2px solid #f9a8d4;
-    border-radius: 18px;
-    box-shadow: 0 18px 60px rgba(76, 5, 25, 0.3);
-}
-
-.zoom-dialog::backdrop {
-    background: rgba(45, 10, 25, 0.78);
-    backdrop-filter: blur(4px);
 }
 
 .zoom-toolbar {
@@ -523,6 +556,7 @@ input:focus-visible {
     border: 0;
 }
 
+/* RWD 響應式調整 */
 @media (max-width: 700px) {
     .top-bar {
         flex-direction: column;
