@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fce7f3">
+    <title>血壓記錄管理系統 - 互動式簡報</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <h1 class="project-title">血壓記錄管理系統簡報</h1>
+        <nav class="quick-nav" aria-label="簡報工具">
+            <label for="slide-select">跳至</label>
+            <select id="slide-select" aria-label="選擇投影片"></select>
+            <button type="button" id="guide-button" aria-controls="site-demo-dialog" aria-expanded="false" hidden>實際網站導覽</button>
+            <button type="button" id="zoom-button" hidden>放大圖片</button>
+            <button type="button" id="fullscreen-button">全螢幕</button>
+        </nav>
+    </header>
+
+    <main class="presentation-container" id="presentation">
+        <div class="slide-frame" id="slide-frame">
+            <img
+                id="slide-image"
+                class="slide-image"
+                src="slides/slide-01.jpg"
+                alt="第 1 頁，共 27 頁"
+                width="1920"
+                height="1080"
+                fetchpriority="high"
+            >
+            <a
+                id="cover-live-link"
+                class="cover-live-link"
+                href="https://demi960613.github.io/blood_pressure/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="開啟線上血壓記錄管理系統"
+                hidden
+            >開啟線上系統</a>
+            <nav id="toc-hotspots" class="toc-hotspots" aria-label="目錄章節" hidden>
+                <button type="button" data-slide="3" aria-label="跳至專案簡介與設計理念">壹、專案簡介與設計理念</button>
+                <button type="button" data-slide="5" aria-label="跳至網站架構與頁面功能">貳、網站架構與頁面功能</button>
+                <button type="button" data-slide="9" aria-label="跳至網頁開發技術與工具">參、網頁開發技術與工具</button>
+                <button type="button" data-slide="11" aria-label="跳至操作流程與畫面展示">肆、操作流程與畫面展示</button>
+                <button type="button" data-slide="20" aria-label="跳至開發歷程與問題解決">伍、開發歷程與問題解決</button>
+                <span class="toc-hint">點選章節文字即可跳頁</span>
+            </nav>
+        </div>
+    </main>
+
+    <dialog id="site-demo-dialog" class="site-demo-dialog" aria-labelledby="site-demo-title">
+        <header class="site-demo-header">
+            <div>
+                <h2 id="site-demo-title">血壓系統｜實際網站導覽</h2>
+                <p>在左側看導覽提示，右側可直接操作線上網站。</p>
+            </div>
+            <div class="site-demo-header-actions">
+                <a href="https://demi960613.github.io/blood_pressure/" target="_blank" rel="noopener noreferrer">另開網站 ↗</a>
+                <button type="button" id="demo-close">關閉</button>
+            </div>
+        </header>
+        <div class="site-demo-layout">
+            <aside id="guide-panel" class="guide-panel" aria-labelledby="guide-title">
+                <p id="guide-count" class="guide-count"></p>
+                <h3 id="guide-title"></h3>
+                <p id="guide-text"></p>
+                <p id="guide-note" class="guide-note" role="status"></p>
+                <div class="guide-actions">
+                    <button type="button" id="guide-previous">上一步</button>
+                    <button type="button" id="guide-next">下一步</button>
+                </div>
+            </aside>
+            <div class="live-app-frame">
+                <iframe
+                    id="live-app-frame"
+                    title="血壓記錄管理系統實際網站"
+                    src="about:blank"
+                    data-src="https://demi960613.github.io/blood_pressure/"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                ></iframe>
+                <p id="frame-status" class="frame-status" role="status">連線後會在實際網站上標示目前步驟。</p>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="zoom-dialog" class="zoom-dialog" aria-label="放大檢視投影片">
+        <div class="zoom-toolbar">
+            <span id="zoom-caption"></span>
+            <button type="button" id="zoom-close">關閉</button>
+        </div>
+        <img id="zoom-image" alt="">
+    </dialog>
+
+    <footer class="nav-controls" aria-label="投影片導覽">
+        <button type="button" id="previous-button" aria-label="上一頁">上一頁</button>
+        <label class="visually-hidden" for="slide-range">投影片頁數</label>
+        <input id="slide-range" type="range" min="1" max="27" value="1">
+        <output id="page-indicator" for="slide-range" aria-live="polite">1 / 27</output>
+        <button type="button" id="next-button" aria-label="下一頁">下一頁</button>
+        <span id="status-message" class="visually-hidden" role="status"></span>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
