@@ -296,29 +296,40 @@ function moveGuideStep(offset) {
     const nextStep = currentGuideStep + offset;
     if (nextStep < 0 || nextStep >= guideSteps.length) return;
 
-    // ===== 新增：時光倒流防呆機制 =====
-    // 如果是「上一步」(offset === -1)，且正要回到「點擊開啟彈窗」(index 10) 的步驟
+    // ===== 終極大絕招：無死角強制關閉彈窗 =====
     if (offset === -1 && nextStep === 10 && liveAppDocument) {
         const gameModal = liveAppDocument.querySelector('#game-modal-overlay');
         if (gameModal) {
-            // 嘗試尋找彈窗內的關閉按鈕 (通常右上角的 X) 並觸發點擊
-            // 這裡列了幾個常見的 class/id 命名，你可以依據你的血壓網站實際名稱調整
-            const closeBtn = gameModal.querySelector('.close-btn, .close, #close-modal-btn, button[aria-label="Close"]');
-            if (closeBtn) {
-                closeBtn.click();
-            } else {
-                // 如果找不到按鈕，直接觸發 Escape 鍵或將它隱藏
-                gameModal.style.display = 'none'; 
+            // 招式 1：如果是原生的 <dialog> 標籤，直接呼叫內建關閉
+            if (typeof gameModal.close === 'function') {
+                gameModal.close();
             }
+            
+            // 招式 2：模擬使用者按下鍵盤的「Esc 鍵」
+            liveAppDocument.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            
+            // 招式 3：找出彈窗裡「所有」可能的關閉按鈕，通通點一次
+            const buttons = gameModal.querySelectorAll('button, .close, .close-btn');
+            buttons.forEach(btn => {
+                const text = btn.textContent.toLowerCase();
+                const id = btn.id.toLowerCase();
+                const cls = btn.className.toLowerCase();
+                // 只要按鈕名字或內容有 X、關閉、close，就觸發點擊
+                if (text.includes('×') || text.includes('x') || text.includes('關閉') || id.includes('close') || cls.includes('close')) {
+                    btn.click();
+                }
+            });
+
+            // 招式 4：如果你有寫「點擊背景遮罩關閉」的功能，觸發背景點擊
+            gameModal.click();
         }
     }
-    // ===================================
+    // ==========================================
 
     currentGuideStep = nextStep;
     showSlide(guideSteps[currentGuideStep].slide, { keepGuideStep: true });
     updateGuideStep();
 }
-
 guideButton.addEventListener('click', openGuide);
 demoCloseButton.addEventListener('click', closeGuide);
 siteDemoDialog.addEventListener('close', handleDemoClose);
