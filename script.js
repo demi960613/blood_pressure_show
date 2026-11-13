@@ -33,11 +33,12 @@ let currentGuideStep = -1;
 let liveAppDocument = null;
 let liveAppObserver = null;
 let highlightedTarget = null;
+let tourHighlightBox = null;
 let liveAppRequested = false;
 
 const guideSteps = [
-    { slide: 13, target: '#toggleFormButton', title: '展開新增表單', text: '在線上網站按「新增」展開血壓輸入表單。這一步會直接標示網站上的按鈕。' },
     { slide: 13, target: '#selectedMemberLabel', closest: 'button', title: '確認或切換成員', text: '預設成員可直接使用；若要替其他人記錄，按成員選單切換。' },
+    { slide: 13, target: '#toggleFormButton', title: '展開新增表單', text: '在線上網站按「新增」展開血壓輸入表單。這一步會直接標示網站上的按鈕。' },
     { slide: 13, target: '#recordDate', title: '輸入測量資料', text: '填入測量日期、收縮壓、舒張壓和脈搏。防呆測試請用無效值；無效資料不會被儲存。' },
     { slide: 13, target: '#submitBtn', title: '觸發防呆檢查', text: '可將收縮壓設為 20、舒張壓設為 80，按「儲存」測試防呆。這組無效資料會被拒絕，不會寫入紀錄。', note: '請勿用真實健康數值做測試；完成後按錯誤視窗中的「了解」並清空測試值。' },
     { slide: 13, target: '.app-modal-content', title: '查看防呆提示', text: '錯誤提示會在網站畫面中央出現，列出需要修正的欄位。按「了解」關閉提示，再清空測試資料。', note: '若尚未觸發錯誤，提示框會在你按下「儲存」後才出現。' },
@@ -75,9 +76,24 @@ function updateGuideStep() {
 }
 
 function clearLiveTarget() {
-    if (!highlightedTarget) return;
-    highlightedTarget.classList.remove('blood-pressure-tour-target');
+    tourHighlightBox?.classList.remove('is-visible');
     highlightedTarget = null;
+}
+
+function updateHighlightBoxPosition() {
+    if (!highlightedTarget || !tourHighlightBox) return;
+
+    const targetRect = highlightedTarget.getBoundingClientRect();
+    const frameRect = liveAppFrame.getBoundingClientRect();
+    const frameContainer = liveAppFrame.parentElement;
+    const containerRect = frameContainer.getBoundingClientRect();
+    const frameOriginX = frameRect.left + liveAppFrame.clientLeft;
+    const frameOriginY = frameRect.top + liveAppFrame.clientTop;
+
+    tourHighlightBox.style.top = `${targetRect.top + frameOriginY - containerRect.top - frameContainer.clientTop}px`;
+    tourHighlightBox.style.left = `${targetRect.left + frameOriginX - containerRect.left - frameContainer.clientLeft}px`;
+    tourHighlightBox.style.width = `${targetRect.width}px`;
+    tourHighlightBox.style.height = `${targetRect.height}px`;
 }
 
 function updateLiveTarget() {
@@ -94,15 +110,23 @@ function updateLiveTarget() {
     }
 
     if (highlightedTarget !== target) {
-        clearLiveTarget();
-        target.classList.add('blood-pressure-tour-target');
         highlightedTarget = target;
+        target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+        window.requestAnimationFrame(updateHighlightBoxPosition);
     }
+    updateHighlightBoxPosition();
+    tourHighlightBox.classList.add('is-visible');
     guideNote.textContent = `${notePrefix}已在右側網站標示目前步驟，請直接操作後再按「下一步」。`;
-    target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 }
 
 function handleLiveAppLoad() {
+    liveAppObserver?.disconnect();
+    liveAppObserver = null;
+    clearLiveTarget();
+    tourHighlightBox?.remove();
+    tourHighlightBox = null;
+    liveAppDocument = null;
+
     const expectedUrl = new URL(liveAppFrame.dataset.src);
     let frameUrl;
     try {
@@ -125,27 +149,29 @@ function handleLiveAppLoad() {
         liveAppDocument = liveAppFrame.contentDocument;
         if (!liveAppDocument?.body) throw new Error('The live app document is not ready.');
 
-        const tourStyle = liveAppDocument.createElement('style');
-        tourStyle.textContent = `
-            .blood-pressure-tour-target {
-                position: relative !important;
-                z-index: 1300 !important;
-                outline: 4px solid #ec4899 !important;
-                outline-offset: 3px !important;
-                box-shadow: 0 0 0 6px rgba(236, 72, 153, 0.22) !important;
-            }
-        `;
-        liveAppDocument.head.append(tourStyle);
+        tourHighlightBox = document.createElement('div');
+        tourHighlightBox.className = 'tour-highlight-box';
+        tourHighlightBox.setAttribute('aria-hidden', 'true');
+        liveAppFrame.parentElement.append(tourHighlightBox);
         frameStatus.textContent = '已連上實際網站。請勿儲存或匯入真實健康資料；無效的防呆測試資料不會被儲存。';
-        liveAppObserver = new liveAppFrame.contentWindow.MutationObserver(updateLiveTarget);
+        liveAppObserver = new liveAppFrame.contentWindow.MutationObserver((mutations) => {
+            if (mutations.some((mutation) => mutation.target !== tourHighlightBox)) updateLiveTarget();
+        });
         liveAppObserver.observe(liveAppDocument.body, {
             attributes: true,
             attributeFilter: ['class', 'hidden', 'style'],
             childList: true,
             subtree: true,
         });
+        liveAppFrame.contentWindow.addEventListener('scroll', updateHighlightBoxPosition, true);
+        liveAppFrame.contentWindow.addEventListener('resize', updateHighlightBoxPosition);
+        window.addEventListener('resize', updateHighlightBoxPosition);
         updateGuideStep();
     } catch (error) {
+        liveAppObserver?.disconnect();
+        liveAppObserver = null;
+        tourHighlightBox?.remove();
+        tourHighlightBox = null;
         liveAppDocument = null;
         console.error('Unable to prepare the live-site tour.', error);
         frameStatus.textContent = '無法在嵌入頁面啟用導覽標示。請按「另開網站 ↗」操作，或重新整理後再試。';
@@ -180,6 +206,7 @@ function showSlide(page, { keepGuideStep = false } = {}) {
     nextButton.disabled = currentSlide === totalSlides;
     coverLiveLink.hidden = currentSlide !== 1;
     tocHotspots.hidden = currentSlide !== 2;
+    slideFrame.classList.toggle('show-toc', currentSlide === 2);
     guideButton.hidden = !guideSteps.some((step) => step.slide === currentSlide);
     zoomButton.hidden = currentSlide < 13 || currentSlide > 19;
     statusMessage.textContent = '';
@@ -235,8 +262,8 @@ function moveGuideStep(offset) {
     if (nextStep < 0 || nextStep >= guideSteps.length) return;
 
     currentGuideStep = nextStep;
-    updateGuideStep();
     showSlide(guideSteps[currentGuideStep].slide, { keepGuideStep: true });
+    updateGuideStep();
 }
 
 guideButton.addEventListener('click', openGuide);
