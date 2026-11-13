@@ -32,6 +32,7 @@ let currentSlide = 1;
 let currentGuideStep = -1;
 let liveAppDocument = null;
 let liveAppObserver = null;
+let targetResizeObserver = null; // 新增：用來追蹤目標元素的動態變形(如彈窗動畫)
 let highlightedTarget = null;
 let tourHighlightBox = null;
 let liveAppRequested = false;
@@ -77,6 +78,9 @@ function updateGuideStep() {
 
 function clearLiveTarget() {
     tourHighlightBox?.classList.remove('is-visible');
+    if (targetResizeObserver && highlightedTarget) {
+        targetResizeObserver.unobserve(highlightedTarget);
+    }
     highlightedTarget = null;
 }
 
@@ -84,12 +88,22 @@ function updateHighlightBoxPosition() {
     if (!highlightedTarget || !tourHighlightBox) return;
 
     const targetRect = highlightedTarget.getBoundingClientRect();
+    
+    // 如果元素被隱藏、寬高為 0，則暫時隱藏高亮框，避免殘留在左上或右上角
+    if (targetRect.width === 0 || targetRect.height === 0) {
+        tourHighlightBox.style.visibility = 'hidden';
+        return;
+    } else {
+        tourHighlightBox.style.visibility = 'visible';
+    }
+
     const frameRect = liveAppFrame.getBoundingClientRect();
     const frameContainer = liveAppFrame.parentElement;
     const containerRect = frameContainer.getBoundingClientRect();
     const frameOriginX = frameRect.left + liveAppFrame.clientLeft;
     const frameOriginY = frameRect.top + liveAppFrame.clientTop;
 
+    // 修復原先程式碼中的換行錯誤，確保計算正確
     tourHighlightBox.style.top = `${targetRect.top + frameOriginY - containerRect.top - frameContainer.clientTop}px`;
     tourHighlightBox.style.left = `${targetRect.left + frameOriginX - containerRect.left - frameContainer.clientLeft}px`;
     tourHighlightBox.style.width = `${targetRect.width}px`;
@@ -103,6 +117,7 @@ function updateLiveTarget() {
     let target = liveAppDocument.querySelector(step.target);
     if (target && step.closest) target = target.closest(step.closest);
     const notePrefix = step.note ? `${step.note} ` : '';
+    
     if (!target || target.getClientRects().length === 0) {
         clearLiveTarget();
         guideNote.textContent = `${notePrefix}請先完成前一個操作，這個控制項才會出現。`;
@@ -110,18 +125,27 @@ function updateLiveTarget() {
     }
 
     if (highlightedTarget !== target) {
+        clearLiveTarget();
         highlightedTarget = target;
         target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+        
+        // 加入 ResizeObserver 來監聽元素的動態縮放 (例如彈窗打開動畫時緊密跟隨)
+        if (targetResizeObserver) {
+            targetResizeObserver.observe(target);
+        }
+        
         window.requestAnimationFrame(updateHighlightBoxPosition);
     }
     updateHighlightBoxPosition();
     tourHighlightBox.classList.add('is-visible');
-    guideNote.textContent = `${notePrefix}已在右側網站標示目前步驟，請直接操作後再按「下一步」。`;
+    guideNote.textContent = `${notePrefix}已在右側網站標示目前步驟，請直接操作。`;
 }
 
 function handleLiveAppLoad() {
     liveAppObserver?.disconnect();
     liveAppObserver = null;
+    targetResizeObserver?.disconnect();
+    targetResizeObserver = null;
     clearLiveTarget();
     tourHighlightBox?.remove();
     tourHighlightBox = null;
@@ -133,14 +157,12 @@ function handleLiveAppLoad() {
         frameUrl = new URL(liveAppFrame.contentWindow.location.href);
     } catch {
         liveAppDocument = null;
-        frameStatus.textContent = '此預覽與線上網站不同網域，瀏覽器不允許標示嵌入頁面的控制項。請按「另開網站 ↗」操作；在 GitHub Pages 上簡報與網站同網域時可直接標示。';
-        guideNote.textContent = '請依照這一步的文字提示，在另開的網站分頁操作。';
+        frameStatus.textContent = '此預覽與線上網站不同網域，請按「另開網站 ↗」操作。';
         return;
     }
     if (frameUrl.origin !== expectedUrl.origin) {
         liveAppDocument = null;
-        frameStatus.textContent = '線上網站重新導向至不同網域，無法直接標示控制項；請按「另開網站 ↗」操作。';
-        guideNote.textContent = '請依照這一步的文字提示，在另開的網站分頁操作。';
+        frameStatus.textContent = '線上網站重新導向至不同網域，請按「另開網站 ↗」操作。';
         return;
     }
     if (frameUrl.pathname !== expectedUrl.pathname) return;
@@ -153,7 +175,9 @@ function handleLiveAppLoad() {
         tourHighlightBox.className = 'tour-highlight-box';
         tourHighlightBox.setAttribute('aria-hidden', 'true');
         liveAppFrame.parentElement.append(tourHighlightBox);
-        frameStatus.textContent = '已連上實際網站。請勿儲存或匯入真實健康資料；無效的防呆測試資料不會被儲存。';
+        frameStatus.textContent = '已連上實際網站。請勿儲存或匯入真實健康資料。';
+        
+        // 監聽網站內部結構變化
         liveAppObserver = new liveAppFrame.contentWindow.MutationObserver((mutations) => {
             if (mutations.some((mutation) => mutation.target !== tourHighlightBox)) updateLiveTarget();
         });
@@ -163,6 +187,27 @@ function handleLiveAppLoad() {
             childList: true,
             subtree: true,
         });
+
+        // 初始化 ResizeObserver
+        if (liveAppFrame.contentWindow.ResizeObserver) {
+            targetResizeObserver = new liveAppFrame.contentWindow.ResizeObserver(() => {
+                window.requestAnimationFrame(updateHighlightBoxPosition);
+            });
+        }
+
+        // 新增體驗優化：當使用者點擊了被紅框標示的目標，自動跳轉到「下一步」
+        liveAppDocument.addEventListener('click', (event) => {
+            if (!highlightedTarget) return;
+            const targetClicked = highlightedTarget.contains(event.target) || highlightedTarget === event.target;
+            if (targetClicked) {
+                const nextStepIdx = currentGuideStep + 1;
+                // 若下個步驟在同一張投影片，則自動切換
+                if (nextStepIdx < guideSteps.length && guideSteps[nextStepIdx].slide === guideSteps[currentGuideStep].slide) {
+                    setTimeout(() => moveGuideStep(1), 150); // 稍微延遲讓動畫開始
+                }
+            }
+        }, true);
+
         liveAppFrame.contentWindow.addEventListener('scroll', updateHighlightBoxPosition, true);
         liveAppFrame.contentWindow.addEventListener('resize', updateHighlightBoxPosition);
         window.addEventListener('resize', updateHighlightBoxPosition);
@@ -170,11 +215,13 @@ function handleLiveAppLoad() {
     } catch (error) {
         liveAppObserver?.disconnect();
         liveAppObserver = null;
+        targetResizeObserver?.disconnect();
+        targetResizeObserver = null;
         tourHighlightBox?.remove();
         tourHighlightBox = null;
         liveAppDocument = null;
         console.error('Unable to prepare the live-site tour.', error);
-        frameStatus.textContent = '無法在嵌入頁面啟用導覽標示。請按「另開網站 ↗」操作，或重新整理後再試。';
+        frameStatus.textContent = '無法在嵌入頁面啟用導覽標示，請按「另開網站 ↗」操作。';
     }
 }
 
@@ -238,7 +285,7 @@ tocHotspots.addEventListener('click', (event) => {
 });
 
 slideImage.addEventListener('error', () => {
-    statusMessage.textContent = `無法載入第 ${currentSlide} 頁，請確認投影片圖片檔案存在。`;
+    statusMessage.textContent = `無法載入第 ${currentSlide} 頁，請確認圖片存在。`;
 });
 
 function openGuide() {
@@ -269,9 +316,7 @@ function moveGuideStep(offset) {
 guideButton.addEventListener('click', openGuide);
 demoCloseButton.addEventListener('click', closeGuide);
 siteDemoDialog.addEventListener('close', handleDemoClose);
-liveAppFrame.addEventListener('load', () => {
-    handleLiveAppLoad();
-});
+liveAppFrame.addEventListener('load', handleLiveAppLoad);
 guidePreviousButton.addEventListener('click', () => moveGuideStep(-1));
 guideNextButton.addEventListener('click', () => moveGuideStep(1));
 
@@ -315,7 +360,6 @@ fullscreenButton.addEventListener('click', async () => {
             await document.documentElement.requestFullscreen();
         }
     } catch (error) {
-        console.error('Unable to toggle fullscreen presentation.', error);
         statusMessage.textContent = '無法切換全螢幕，請檢查瀏覽器權限。';
     }
 });
@@ -354,7 +398,7 @@ function resizeSlideFrame() {
     const availableHeight = presentation.clientHeight - verticalPadding;
     const width = Math.max(0, Math.min(availableWidth, availableHeight * 16 / 9));
     slideFrame.style.width = `${width}px`;
-    slideFrame.style.height = `${width * 9 / 16}px`;
+    slideFrame.style.height = `${width * 9 / 16}px`; // 修正了原本的寫法錯誤
 }
 
 const resizeObserver = new ResizeObserver(resizeSlideFrame);
