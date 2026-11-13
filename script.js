@@ -32,10 +32,12 @@ let currentSlide = 1;
 let currentGuideStep = -1;
 let liveAppDocument = null;
 let liveAppObserver = null;
-let targetResizeObserver = null; // 新增：用來追蹤目標元素的動態變形(如彈窗動畫)
 let highlightedTarget = null;
 let tourHighlightBox = null;
 let liveAppRequested = false;
+
+// 新增：用來執行 60fps 追蹤的變數
+let trackPositionFrame = null; 
 
 const guideSteps = [
     { slide: 13, target: '#selectedMemberLabel', closest: 'button', title: '確認或切換成員', text: '預設成員可直接使用；若要替其他人記錄，按成員選單切換。' },
@@ -78,36 +80,37 @@ function updateGuideStep() {
 
 function clearLiveTarget() {
     tourHighlightBox?.classList.remove('is-visible');
-    if (targetResizeObserver && highlightedTarget) {
-        targetResizeObserver.unobserve(highlightedTarget);
+    if (trackPositionFrame) {
+        cancelAnimationFrame(trackPositionFrame);
+        trackPositionFrame = null;
     }
     highlightedTarget = null;
 }
 
-function updateHighlightBoxPosition() {
+// 核心解法：每秒 60 次不斷更新高亮框的位置 (完美克服動畫問題)
+function trackTargetPosition() {
     if (!highlightedTarget || !tourHighlightBox) return;
 
     const targetRect = highlightedTarget.getBoundingClientRect();
     
-    // 如果元素被隱藏、寬高為 0，則暫時隱藏高亮框，避免殘留在左上或右上角
     if (targetRect.width === 0 || targetRect.height === 0) {
         tourHighlightBox.style.visibility = 'hidden';
-        return;
     } else {
         tourHighlightBox.style.visibility = 'visible';
+        const frameRect = liveAppFrame.getBoundingClientRect();
+        const frameContainer = liveAppFrame.parentElement;
+        const containerRect = frameContainer.getBoundingClientRect();
+        const frameOriginX = frameRect.left + liveAppFrame.clientLeft;
+        const frameOriginY = frameRect.top + liveAppFrame.clientTop;
+
+        tourHighlightBox.style.top = `${targetRect.top + frameOriginY - containerRect.top - frameContainer.clientTop}px`;
+        tourHighlightBox.style.left = `${targetRect.left + frameOriginX - containerRect.left - frameContainer.clientLeft}px`;
+        tourHighlightBox.style.width = `${targetRect.width}px`;
+        tourHighlightBox.style.height = `${targetRect.height}px`;
     }
 
-    const frameRect = liveAppFrame.getBoundingClientRect();
-    const frameContainer = liveAppFrame.parentElement;
-    const containerRect = frameContainer.getBoundingClientRect();
-    const frameOriginX = frameRect.left + liveAppFrame.clientLeft;
-    const frameOriginY = frameRect.top + liveAppFrame.clientTop;
-
-    // 修復原先程式碼中的換行錯誤，確保計算正確
-    tourHighlightBox.style.top = `${targetRect.top + frameOriginY - containerRect.top - frameContainer.clientTop}px`;
-    tourHighlightBox.style.left = `${targetRect.left + frameOriginX - containerRect.left - frameContainer.clientLeft}px`;
-    tourHighlightBox.style.width = `${targetRect.width}px`;
-    tourHighlightBox.style.height = `${targetRect.height}px`;
+    // 呼叫下一個影格繼續追蹤
+    trackPositionFrame = requestAnimationFrame(trackTargetPosition);
 }
 
 function updateLiveTarget() {
@@ -129,14 +132,10 @@ function updateLiveTarget() {
         highlightedTarget = target;
         target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
         
-        // 加入 ResizeObserver 來監聽元素的動態縮放 (例如彈窗打開動畫時緊密跟隨)
-        if (targetResizeObserver) {
-            targetResizeObserver.observe(target);
-        }
-        
-        window.requestAnimationFrame(updateHighlightBoxPosition);
+        // 啟動 60fps 追蹤
+        trackPositionFrame = requestAnimationFrame(trackTargetPosition);
     }
-    updateHighlightBoxPosition();
+    
     tourHighlightBox.classList.add('is-visible');
     guideNote.textContent = `${notePrefix}已在右側網站標示目前步驟，請直接操作。`;
 }
@@ -144,8 +143,6 @@ function updateLiveTarget() {
 function handleLiveAppLoad() {
     liveAppObserver?.disconnect();
     liveAppObserver = null;
-    targetResizeObserver?.disconnect();
-    targetResizeObserver = null;
     clearLiveTarget();
     tourHighlightBox?.remove();
     tourHighlightBox = null;
@@ -177,7 +174,6 @@ function handleLiveAppLoad() {
         liveAppFrame.parentElement.append(tourHighlightBox);
         frameStatus.textContent = '已連上實際網站。請勿儲存或匯入真實健康資料。';
         
-        // 監聽網站內部結構變化
         liveAppObserver = new liveAppFrame.contentWindow.MutationObserver((mutations) => {
             if (mutations.some((mutation) => mutation.target !== tourHighlightBox)) updateLiveTarget();
         });
@@ -188,35 +184,27 @@ function handleLiveAppLoad() {
             subtree: true,
         });
 
-        // 初始化 ResizeObserver
-        if (liveAppFrame.contentWindow.ResizeObserver) {
-            targetResizeObserver = new liveAppFrame.contentWindow.ResizeObserver(() => {
-                window.requestAnimationFrame(updateHighlightBoxPosition);
-            });
-        }
-
-        // 新增體驗優化：當使用者點擊了被紅框標示的目標，自動跳轉到「下一步」
+        // 核心解法：點擊按鈕瞬間「強制隱藏舊框」，並推進下一步
         liveAppDocument.addEventListener('click', (event) => {
             if (!highlightedTarget) return;
             const targetClicked = highlightedTarget.contains(event.target) || highlightedTarget === event.target;
             if (targetClicked) {
+                // 1. 瞬間隱藏高亮框，防止殘留
+                tourHighlightBox.classList.remove('is-visible');
+                tourHighlightBox.style.visibility = 'hidden';
+                
+                // 2. 判斷是否要自動進入下一步
                 const nextStepIdx = currentGuideStep + 1;
-                // 若下個步驟在同一張投影片，則自動切換
                 if (nextStepIdx < guideSteps.length && guideSteps[nextStepIdx].slide === guideSteps[currentGuideStep].slide) {
-                    setTimeout(() => moveGuideStep(1), 150); // 稍微延遲讓動畫開始
+                    setTimeout(() => moveGuideStep(1), 50); // 給彈窗一點時間渲染
                 }
             }
         }, true);
 
-        liveAppFrame.contentWindow.addEventListener('scroll', updateHighlightBoxPosition, true);
-        liveAppFrame.contentWindow.addEventListener('resize', updateHighlightBoxPosition);
-        window.addEventListener('resize', updateHighlightBoxPosition);
         updateGuideStep();
     } catch (error) {
         liveAppObserver?.disconnect();
         liveAppObserver = null;
-        targetResizeObserver?.disconnect();
-        targetResizeObserver = null;
         tourHighlightBox?.remove();
         tourHighlightBox = null;
         liveAppDocument = null;
@@ -398,7 +386,7 @@ function resizeSlideFrame() {
     const availableHeight = presentation.clientHeight - verticalPadding;
     const width = Math.max(0, Math.min(availableWidth, availableHeight * 16 / 9));
     slideFrame.style.width = `${width}px`;
-    slideFrame.style.height = `${width * 9 / 16}px`; // 修正了原本的寫法錯誤
+    slideFrame.style.height = `${width * 9 / 16}px`; 
 }
 
 const resizeObserver = new ResizeObserver(resizeSlideFrame);
