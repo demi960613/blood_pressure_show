@@ -33,22 +33,36 @@ input:focus-visible {
     outline-offset: 2px;
 }
 
+/* ==========================================
+   全新浮動玻璃擬態控制列 (HUD 風格)
+   ========================================== */
+
+/* 上方功能列：頂部懸浮毛玻璃膠囊 */
 .top-bar {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(94%, 1300px);
     display: flex;
-    flex: none;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 12px 24px;
-    background: rgba(255, 255, 255, 0.88);
-    border-bottom: 1px solid #fbcfe8;
-    box-shadow: 0 4px 12px rgba(244, 114, 182, 0.08);
+    padding: 10px 24px;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 50px;
+    box-shadow: 0 10px 30px rgba(76, 5, 25, 0.12);
 }
 
 .project-title {
     margin: 0;
     color: #be185d;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
 }
 
 .quick-nav {
@@ -68,6 +82,7 @@ input:focus-visible {
     border: 1px solid #f472b6;
     border-radius: 20px;
     cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .quick-nav button:hover,
@@ -75,15 +90,40 @@ input:focus-visible {
     background: #fce7f3;
 }
 
-.presentation-container {
+/* 下方功能列：底部懸浮毛玻璃膠囊 */
+.nav-controls {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(94%, 900px);
     display: flex;
-    flex: 1;
     align-items: center;
     justify-content: center;
     gap: 16px;
+    padding: 10px 24px;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 50px;
+    box-shadow: 0 10px 30px rgba(76, 5, 25, 0.12);
+}
+
+/* 沉浸式全螢幕主容器 */
+.presentation-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
-    min-height: 0;
-    padding: 16px;
+    height: 100vh;
+    height: 100dvh;
+    padding: 0;
+    background: radial-gradient(circle at center, #2d0a1d 0%, #1a030f 100%);
+    overflow: hidden;
 }
 
 .slide-frame {
@@ -91,8 +131,9 @@ input:focus-visible {
     flex: none;
     overflow: hidden;
     background: #fff;
-    box-shadow: 0 12px 32px rgba(131, 24, 67, 0.14);
-    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .slide-image {
@@ -514,30 +555,19 @@ input:focus-visible {
     object-fit: contain;
 }
 
-.nav-controls {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.9);
-    border-top: 1px solid #fbcfe8;
-}
-
 .nav-controls button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
 }
 
 #slide-range {
-    width: min(42vw, 440px);
+    width: min(35vw, 320px);
     accent-color: #db2777;
     cursor: pointer;
 }
 
 #page-indicator {
-    min-width: 64px;
+    min-width: 60px;
     color: #831843;
     font-weight: 700;
     text-align: center;
@@ -556,35 +586,49 @@ input:focus-visible {
     border: 0;
 }
 
-/* RWD 響應式調整 */
+/* ==========================================
+   RWD 響應式手機版適配
+   ========================================== */
 @media (max-width: 700px) {
     .top-bar {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 10px 12px;
+        top: 8px;
+        width: 96%;
+        padding: 8px 12px;
+        border-radius: 16px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
     }
 
     .project-title {
-        font-size: 0.95rem;
+        display: none; /* 手機版隱藏冗長標題，最大化工具列空間 */
     }
 
     .quick-nav {
         justify-content: flex-end;
         flex-wrap: wrap;
         gap: 6px;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
+        width: 100%;
     }
 
     .quick-nav select,
     .quick-nav button,
     .nav-controls button {
-        padding: 7px 10px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
     }
 
-    .presentation-container {
-        flex-direction: column;
-        justify-content: center;
-        padding: 8px;
+    .nav-controls {
+        bottom: 8px;
+        width: 96%;
+        padding: 8px 12px;
+        border-radius: 16px;
+        gap: 6px;
+    }
+
+    #slide-range {
+        width: min(30vw, 120px);
     }
 
     .toc-hotspots {
@@ -637,15 +681,6 @@ input:focus-visible {
 
     .guide-actions {
         padding-top: 10px;
-    }
-
-    .nav-controls {
-        gap: 8px;
-        padding: 10px 8px;
-    }
-
-    #slide-range {
-        width: min(28vw, 180px);
     }
 }
 
@@ -710,32 +745,24 @@ input:focus-visible {
 }
 
 @media (max-width: 380px) {
-    .top-bar {
-        padding: 8px;
-    }
-
-    .quick-nav {
-        justify-content: flex-start;
-    }
-
     .quick-nav select,
     .quick-nav button {
-        padding: 6px 8px;
-        font-size: 0.78rem;
+        padding: 5px 6px;
+        font-size: 0.75rem;
     }
 
     .nav-controls {
-        gap: 5px;
-        padding: 8px 5px;
+        gap: 4px;
+        padding: 6px 8px;
     }
 
     .nav-controls button {
-        padding: 6px 8px;
-        font-size: 0.8rem;
+        padding: 5px 6px;
+        font-size: 0.75rem;
     }
 
     #page-indicator {
-        min-width: 48px;
-        font-size: 0.8rem;
+        min-width: 44px;
+        font-size: 0.75rem;
     }
 }

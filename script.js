@@ -35,8 +35,6 @@ let liveAppObserver = null;
 let highlightedTarget = null;
 let tourHighlightBox = null;
 let liveAppRequested = false;
-
-// 新增：用來執行 60fps 追蹤的變數
 let trackPositionFrame = null; 
 
 const guideSteps = [
@@ -87,7 +85,6 @@ function clearLiveTarget() {
     highlightedTarget = null;
 }
 
-// 核心解法：每秒 60 次不斷更新高亮框的位置 (完美克服動畫問題)
 function trackTargetPosition() {
     if (!highlightedTarget || !tourHighlightBox) return;
 
@@ -109,7 +106,6 @@ function trackTargetPosition() {
         tourHighlightBox.style.height = `${targetRect.height}px`;
     }
 
-    // 呼叫下一個影格繼續追蹤
     trackPositionFrame = requestAnimationFrame(trackTargetPosition);
 }
 
@@ -131,8 +127,6 @@ function updateLiveTarget() {
         clearLiveTarget();
         highlightedTarget = target;
         target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
-        
-        // 啟動 60fps 追蹤
         trackPositionFrame = requestAnimationFrame(trackTargetPosition);
     }
     
@@ -184,19 +178,16 @@ function handleLiveAppLoad() {
             subtree: true,
         });
 
-        // 核心解法：點擊按鈕瞬間「強制隱藏舊框」，並推進下一步
         liveAppDocument.addEventListener('click', (event) => {
             if (!highlightedTarget) return;
             const targetClicked = highlightedTarget.contains(event.target) || highlightedTarget === event.target;
             if (targetClicked) {
-                // 1. 瞬間隱藏高亮框，防止殘留
                 tourHighlightBox.classList.remove('is-visible');
                 tourHighlightBox.style.visibility = 'hidden';
                 
-                // 2. 判斷是否要自動進入下一步
                 const nextStepIdx = currentGuideStep + 1;
                 if (nextStepIdx < guideSteps.length && guideSteps[nextStepIdx].slide === guideSteps[currentGuideStep].slide) {
-                    setTimeout(() => moveGuideStep(1), 50); // 給彈窗一點時間渲染
+                    setTimeout(() => moveGuideStep(1), 350); // 延長至 350ms，等彈窗順利展開
                 }
             }
         }, true);
@@ -296,40 +287,29 @@ function moveGuideStep(offset) {
     const nextStep = currentGuideStep + offset;
     if (nextStep < 0 || nextStep >= guideSteps.length) return;
 
-    // ===== 終極大絕招：無死角強制關閉彈窗 =====
     if (offset === -1 && nextStep === 10 && liveAppDocument) {
         const gameModal = liveAppDocument.querySelector('#game-modal-overlay');
         if (gameModal) {
-            // 招式 1：如果是原生的 <dialog> 標籤，直接呼叫內建關閉
-            if (typeof gameModal.close === 'function') {
-                gameModal.close();
-            }
-            
-            // 招式 2：模擬使用者按下鍵盤的「Esc 鍵」
+            if (typeof gameModal.close === 'function') gameModal.close();
             liveAppDocument.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-            
-            // 招式 3：找出彈窗裡「所有」可能的關閉按鈕，通通點一次
             const buttons = gameModal.querySelectorAll('button, .close, .close-btn');
             buttons.forEach(btn => {
                 const text = btn.textContent.toLowerCase();
                 const id = btn.id.toLowerCase();
                 const cls = btn.className.toLowerCase();
-                // 只要按鈕名字或內容有 X、關閉、close，就觸發點擊
                 if (text.includes('×') || text.includes('x') || text.includes('關閉') || id.includes('close') || cls.includes('close')) {
                     btn.click();
                 }
             });
-
-            // 招式 4：如果你有寫「點擊背景遮罩關閉」的功能，觸發背景點擊
             gameModal.click();
         }
     }
-    // ==========================================
 
     currentGuideStep = nextStep;
     showSlide(guideSteps[currentGuideStep].slide, { keepGuideStep: true });
     updateGuideStep();
 }
+
 guideButton.addEventListener('click', openGuide);
 demoCloseButton.addEventListener('click', closeGuide);
 siteDemoDialog.addEventListener('close', handleDemoClose);
